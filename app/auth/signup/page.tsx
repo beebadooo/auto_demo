@@ -105,7 +105,9 @@ export default function SignUpPage() {
         router.push(`/dashboard/${role}`)
       }, 1500)
     } catch (err) {
-      setError("An error occurred. Please try again.")
+      console.error("Signup error:", err)
+      setError(err instanceof Error ? err.message : "An error occurred. Please try again.")
+      setLoading(false)
     }
   }
 

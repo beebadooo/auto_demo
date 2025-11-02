@@ -15,9 +15,28 @@ export interface AuthToken {
 }
 
 // Create Supabase client for server-side operations
-const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL || "", process.env.SUPABASE_SERVICE_ROLE_KEY || "")
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ""
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || ""
+
+if (!supabaseUrl || !supabaseKey) {
+  console.error(
+    "⚠️  Missing Supabase environment variables!\n" +
+      "Please create a .env.local file with:\n" +
+      "NEXT_PUBLIC_SUPABASE_URL=your_supabase_url\n" +
+      "SUPABASE_SERVICE_ROLE_KEY=your_service_role_key\n" +
+      "NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key"
+  )
+}
+
+const supabase = createClient(supabaseUrl, supabaseKey)
 
 export async function createUser(walletAddress: string, role: User["role"], email?: string): Promise<User> {
+  if (!supabaseUrl || !supabaseKey) {
+    throw new Error(
+      "Supabase is not configured. Please set NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in your .env.local file"
+    )
+  }
+
   const now = new Date()
 
   const { data, error } = await supabase
@@ -33,7 +52,10 @@ export async function createUser(walletAddress: string, role: User["role"], emai
     .select()
     .single()
 
-  if (error) throw new Error(`Failed to create user: ${error.message}`)
+  if (error) {
+    console.error("Supabase error creating user:", error)
+    throw new Error(`Failed to create user: ${error.message}`)
+  }
 
   return {
     id: data.id,
@@ -46,6 +68,11 @@ export async function createUser(walletAddress: string, role: User["role"], emai
 }
 
 export async function getUserByWallet(walletAddress: string): Promise<User | undefined> {
+  if (!supabaseUrl || !supabaseKey) {
+    console.error("Supabase is not configured")
+    return undefined
+  }
+
   const { data, error } = await supabase
     .from("users")
     .select()
@@ -92,6 +119,12 @@ export async function createSession(
   token: string,
   expiresIn: number = 7 * 24 * 60 * 60 * 1000,
 ): Promise<AuthToken> {
+  if (!supabaseUrl || !supabaseKey) {
+    throw new Error(
+      "Supabase is not configured. Please set NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in your .env.local file"
+    )
+  }
+
   const expiresAt = new Date(Date.now() + expiresIn)
 
   const { error } = await supabase.from("sessions").insert({
@@ -101,7 +134,10 @@ export async function createSession(
     created_at: new Date(),
   })
 
-  if (error) throw new Error(`Failed to create session: ${error.message}`)
+  if (error) {
+    console.error("Supabase error creating session:", error)
+    throw new Error(`Failed to create session: ${error.message}`)
+  }
 
   return { token, expiresAt }
 }
