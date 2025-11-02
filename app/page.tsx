@@ -1,5 +1,6 @@
 "use client"
 
+import Image from "next/image"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -63,8 +64,11 @@ export default function Home() {
       <header className="border-b border-border/40 backdrop-blur-sm sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-primary to-accent flex items-center justify-center">
-              <Lock className="w-6 h-6 text-primary-foreground" />
+            <div className="w-20 h-15 rounded-lg from-primary to-accent flex items-center justify-center">
+              <Image src="/logo1.png"
+                alt="AutoTrack logo"
+                width={80} height={50}
+                className="rounded-md" />
             </div>
             <h1 className="text-2xl font-bold text-foreground">AutoTrack</h1>
           </div>
