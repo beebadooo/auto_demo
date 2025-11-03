@@ -4,7 +4,7 @@ import Image from "next/image"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Shield, Zap, Lock, TrendingUp, Users, CheckCircle2 } from "lucide-react"
+import { Shield, Zap, Lock, TrendingUp, Users, CheckCircle2, LogOut } from "lucide-react"
 
 export default function Home() {
   const roles = [
@@ -72,7 +72,7 @@ export default function Home() {
             </div>
             <h1 className="text-2xl font-bold text-foreground">AutoTrack</h1>
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-2 items-center">
             <Button variant="ghost" size="sm" asChild>
               <Link href="/auth/login">Sign In</Link>
             </Button>

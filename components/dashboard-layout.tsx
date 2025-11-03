@@ -61,9 +61,19 @@ export function DashboardLayout({ children, title, role, navItems }: DashboardLa
         <header className="border-b border-border bg-card/50 backdrop-blur sticky top-0 z-30">
           <div className="px-8 py-4 flex items-center justify-between">
             <h1 className="text-2xl font-bold text-foreground">{title}</h1>
-            <Button variant="outline" size="sm">
-              0x1234...5678
-            </Button>
+            <div className="flex items-center gap-3">
+              <Button variant="outline" size="sm">
+                0x1234...5678
+              </Button>
+              <Button variant="ghost" size="sm" asChild>
+                <Link href="/">
+                  <div className="flex items-center">
+                    <LogOut className="w-4 h-4 mr-2" />
+                    <span>Logout</span>
+                  </div>
+                </Link>
+              </Button>
+            </div>
           </div>
         </header>
 

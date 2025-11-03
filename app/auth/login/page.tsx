@@ -29,6 +29,8 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
   const [success, setSuccess] = useState("")
+  const [devLoading, setDevLoading] = useState(false)
+  const [devError, setDevError] = useState("")
 
   const config = roleConfig[role]
 
@@ -66,6 +68,35 @@ export default function LoginPage() {
 
       // Also set cookie for middleware validation
       document.cookie = `authToken=${data.token}; path=/; max-age=${7 * 24 * 60 * 60}`
+
+      // If user logged in via the manufacturer login page but their stored role is different,
+      // offer a local-dev auto-promotion so developers can test manufacturer flows easily.
+      const isLocalhost = typeof window !== "undefined" && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1")
+      if (isLocalhost && role && data.user && data.user.role !== role) {
+        try {
+          // Call dev-only promote endpoint to update role in DB (only active on localhost/dev)
+          const promoteResp = await fetch("/api/debug/promote", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ walletAddress: walletAddress, role }),
+          })
+          const promoteData = await promoteResp.json()
+          if (promoteResp.ok && promoteData.user) {
+            // Update locally stored user to match new role
+            const updatedUser = { ...data.user, role }
+            localStorage.setItem("user", JSON.stringify(updatedUser))
+            localStorage.setItem("userRole", role)
+            setSuccess("Login successful! Promoted to role and redirecting...")
+            setTimeout(() => {
+              router.push(`/dashboard/${role}`)
+            }, 1200)
+            return
+          }
+        } catch (err) {
+          // If promotion fails, fall back to normal behaviour and show a note
+          console.warn("Promotion failed:", err)
+        }
+      }
 
       setSuccess("Login successful! Redirecting...")
       setTimeout(() => {
@@ -185,6 +216,65 @@ export default function LoginPage() {
               </Button>
             </CardContent>
           </Card>
+
+          {/* Dev-only quick signup for manufacturer (localhost only) */}
+          {typeof window !== "undefined" && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") && (
+            <Card className="border-border/40 bg-card/50 backdrop-blur mt-4">
+              <CardHeader>
+                <CardTitle className="text-foreground">Developer Quick Sign Up</CardTitle>
+                <CardDescription className="text-muted-foreground">Create a manufacturer account quickly (dev only)</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {devError && (
+                  <Alert variant="destructive">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription>{devError}</AlertDescription>
+                  </Alert>
+                )}
+
+                <p className="text-sm text-muted-foreground mb-4">Use this to create a manufacturer user for local testing. Enter your wallet address above and click the button.</p>
+                <div className="flex gap-2">
+                  <Button
+                    disabled={devLoading || !walletAddress}
+                    onClick={async () => {
+                      setDevError("")
+                      setDevLoading(true)
+                      try {
+                        const resp = await fetch("/api/auth/register", {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ walletAddress, role: "manufacturer", email: "dev+manufacturer@example.com" }),
+                        })
+                        const data = await resp.json()
+                        if (!resp.ok) {
+                          setDevError(data.error || "Failed to create manufacturer user")
+                          setDevLoading(false)
+                          return
+                        }
+
+                        // store token + user
+                        localStorage.setItem("authToken", data.token)
+                        localStorage.setItem("user", JSON.stringify(data.user))
+                        localStorage.setItem("userRole", data.user.role)
+                        document.cookie = `authToken=${data.token}; path=/; max-age=${7 * 24 * 60 * 60}`
+
+                        // redirect to manufacturer dashboard
+                        router.push(`/dashboard/manufacturer`)
+                      } catch (err) {
+                        console.error("Dev signup error:", err)
+                        setDevError(err instanceof Error ? err.message : String(err))
+                      } finally {
+                        setDevLoading(false)
+                      }
+                    }}
+                    className="w-full bg-emerald-600 hover:bg-emerald-700"
+                  >
+                    {devLoading ? "Creating..." : "Sign Up as Manufacturer (dev)"}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </div>
       </main>
     </div>

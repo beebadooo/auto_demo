@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label"
 import { DashboardLayout } from "@/components/dashboard-layout"
 import { Plus, Factory, CheckCircle2, AlertCircle, Loader2 } from "lucide-react"
 import Link from "next/link"
+import { useAuth } from "@/components/auth-context"
 
 interface FormData {
   vin: string
@@ -40,7 +41,10 @@ interface RegistrationResponse {
   error?: string
 }
 
+
+
 export default function RegisterVehiclePage() {
+  const { user, token: contextToken } = useAuth()
   const [formData, setFormData] = useState<FormData>({
     vin: "",
     make: "",
@@ -59,7 +63,7 @@ export default function RegisterVehiclePage() {
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState(false)
   const [error, setError] = useState("")
-  const [registeredVehicle, setRegisteredVehicle] = useState<RegistrationResponse["vehicle"]>(null)
+  const [registeredVehicle, setRegisteredVehicle] = useState<RegistrationResponse["vehicle"] | undefined>(undefined)
 
   const navItems = [
     { label: "Dashboard", href: "/dashboard/manufacturer", icon: Factory },
@@ -67,6 +71,8 @@ export default function RegisterVehiclePage() {
     { label: "Quality Checks", href: "/dashboard/manufacturer/quality", icon: CheckCircle2 },
     { label: "Recalls", href: "/dashboard/manufacturer/recalls", icon: AlertCircle },
   ]
+
+  // No client-side manufacturer-only guard: any authenticated user may register vehicles
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target
@@ -117,26 +123,31 @@ export default function RegisterVehiclePage() {
     setLoading(true)
 
     try {
+      let bodyPayload: any = {
+        vin: formData.vin.toUpperCase(),
+        make: formData.make,
+        model: formData.model,
+        year: Number.parseInt(formData.year),
+        color: formData.color,
+        bodyType: formData.bodyType,
+        engineType: formData.engineType,
+        transmission: formData.transmission,
+        fuelType: formData.fuelType,
+        seatingCapacity: Number.parseInt(formData.seatingCapacity),
+        manufacturingDate: formData.manufacturingDate,
+        specifications: formData.specifications,
+      }
+
+  const headers: Record<string, string> = { "Content-Type": "application/json" }
+
+  // Use token from auth context if available, otherwise fall back to localStorage (legacy)
+  const sessionToken = contextToken || localStorage.getItem("authToken") || ""
+  if (sessionToken) headers["Authorization"] = `Bearer ${sessionToken}`
+
       const response = await fetch("/api/vehicles/register", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("authToken") || ""}`,
-        },
-        body: JSON.stringify({
-          vin: formData.vin.toUpperCase(),
-          make: formData.make,
-          model: formData.model,
-          year: Number.parseInt(formData.year),
-          color: formData.color,
-          bodyType: formData.bodyType,
-          engineType: formData.engineType,
-          transmission: formData.transmission,
-          fuelType: formData.fuelType,
-          seatingCapacity: Number.parseInt(formData.seatingCapacity),
-          manufacturingDate: formData.manufacturingDate,
-          specifications: formData.specifications,
-        }),
+        headers,
+        body: JSON.stringify(bodyPayload),
       })
 
       const data: RegistrationResponse = await response.json()
@@ -165,6 +176,15 @@ export default function RegisterVehiclePage() {
 
       // Auto-hide success message after 5 seconds
       setTimeout(() => setSuccess(false), 5000)
+      // Notify other parts of the app (dashboard) so they can update recent lists instantly
+      try {
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new CustomEvent("vehicle:registered", { detail: data.vehicle }))
+        }
+      } catch (err) {
+        // non-fatal
+        console.warn("Failed to dispatch vehicle:registered event", err)
+      }
     } catch (err) {
       setError("An error occurred while registering the vehicle")
       console.error(err)
@@ -172,6 +192,8 @@ export default function RegisterVehiclePage() {
       setLoading(false)
     }
   }
+
+  // Wallet integration removed: registration is server-side only
 
   return (
     <DashboardLayout title="Register New Vehicle" role="Manufacturer" navItems={navItems}>
@@ -188,7 +210,8 @@ export default function RegisterVehiclePage() {
                     {registeredVehicle.year} {registeredVehicle.make} {registeredVehicle.model} (VIN:{" "}
                     {registeredVehicle.vin})
                   </p>
-                  <p className="text-xs text-green-600 dark:text-green-300 mt-2">Vehicle ID: {registeredVehicle.id}</p>
+                        <p className="text-xs text-green-600 dark:text-green-300 mt-2">Vehicle ID: {registeredVehicle.id}</p>
+                        
                 </div>
               </div>
             </CardContent>
@@ -215,7 +238,7 @@ export default function RegisterVehiclePage() {
           <CardHeader>
             <CardTitle className="text-foreground">Vehicle Registration Form</CardTitle>
             <CardDescription className="text-muted-foreground">
-              Register a new vehicle on the blockchain. All fields are required.
+              Register a new vehicle. All fields are required.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -440,6 +463,8 @@ export default function RegisterVehiclePage() {
                 </div>
               </div>
 
+              {/* Wallet integration removed - server-side registration only */}
+
               {/* Form Actions */}
               <div className="flex gap-3 pt-4 border-t border-border/40">
                 <Button type="submit" disabled={loading} className="flex-1 bg-primary hover:bg-primary/90">
@@ -451,7 +476,7 @@ export default function RegisterVehiclePage() {
                   ) : (
                     <>
                       <Plus className="w-4 h-4 mr-2" />
-                      Register Vehicle on Blockchain
+                      Register Vehicle
                     </>
                   )}
                 </Button>
@@ -471,13 +496,15 @@ export default function RegisterVehiclePage() {
             <CardTitle className="text-foreground text-base">About Vehicle Registration</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3 text-sm text-muted-foreground">
-            <p>• Each vehicle receives a unique digital identity on the blockchain from the factory gate</p>
+            <p>• Each vehicle receives a unique digital identity in the system from the factory gate</p>
             <p>• The VIN (Vehicle Identification Number) is the primary identifier and must be unique</p>
             <p>• All vehicle data is immutable and tamper-proof once registered</p>
             <p>• This registration creates the foundation for tracking the vehicle throughout its lifecycle</p>
             <p>• Quality checks, recalls, and ownership transfers will be recorded against this registration</p>
           </CardContent>
         </Card>
+
+        {/* Simple alternative implementation removed */}
       </div>
     </DashboardLayout>
   )

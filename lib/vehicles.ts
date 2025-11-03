@@ -33,6 +33,7 @@ export function registerVehicle(
   model: string,
   year: number,
   manufacturerWallet: string,
+  metadata: Record<string, any> = {},
 ): Vehicle {
   const vehicle: Vehicle = {
     id: `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
@@ -40,13 +41,13 @@ export function registerVehicle(
     make,
     model,
     year,
-    ownerWallet: manufacturerWallet,
-    manufacturerWallet,
-    currentOwner: manufacturerWallet,
+    ownerWallet: manufacturerWallet.toLowerCase(),
+    manufacturerWallet: manufacturerWallet.toLowerCase(),
+    currentOwner: manufacturerWallet.toLowerCase(),
     status: "manufactured",
     createdAt: new Date(),
     updatedAt: new Date(),
-    metadata: {},
+    metadata,
   }
   vehicles.set(vehicle.id, vehicle)
   vehicleRecords.set(vehicle.id, [])
@@ -62,8 +63,48 @@ export function getVehicleByVIN(vin: string): Vehicle | undefined {
 }
 
 export function getVehiclesByOwner(ownerWallet: string): Vehicle[] {
-  return Array.from(vehicles.values()).filter((v) => v.currentOwner === ownerWallet.toLowerCase())
+  return Array.from(vehicles.values()).filter((v) => (v.currentOwner || "").toLowerCase() === ownerWallet.toLowerCase())
 }
+
+// Seed demo vehicles when the in-memory store is empty (developer convenience)
+;(function seedDemoVehiclesIfEmpty() {
+  try {
+    if (vehicles.size > 0) return
+
+    const demoManufacturers = [
+      "0xDEMO000000000000000000000000000000000001",
+      "0xDEMO000000000000000000000000000000000002",
+      "0xDEMO000000000000000000000000000000000003",
+    ]
+
+    const sampleMakes = ["Tesla", "BMW", "Audi", "Toyota", "Ford"]
+    const sampleModels = ["Model 3", "X5", "A4", "Corolla", "F-150"]
+
+    function randomVIN() {
+      const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
+      let out = ''
+      for (let i = 0; i < 17; i++) out += chars[Math.floor(Math.random() * chars.length)]
+      return out
+    }
+
+    const now = Date.now()
+    for (let i = 0; i < 6; i++) {
+      const make = sampleMakes[i % sampleMakes.length]
+      const model = sampleModels[i % sampleModels.length]
+      const vin = `${make.substring(0,3).toUpperCase()}-${randomVIN().slice(0,8)}-${i}`
+      const year = 2023 + (i % 3)
+      const manuf = demoManufacturers[i % demoManufacturers.length]
+      const v = registerVehicle(vin, make, model, year, manuf, { demo: true })
+      // backdate a little for display variety
+      v.createdAt = new Date(now - i * 24 * 60 * 60 * 1000)
+      v.updatedAt = new Date(now - i * 24 * 60 * 60 * 1000)
+      vehicles.set(v.id, v)
+    }
+  } catch (err) {
+    // non-fatal; seeding is best-effort
+    console.warn('Demo vehicle seeding failed:', err)
+  }
+})()
 
 export function transferVehicleOwnership(
   vehicleId: string,
